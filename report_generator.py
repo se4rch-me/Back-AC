@@ -8,13 +8,13 @@ from googleapiclient.http import MediaIoBaseUpload
 
 # --- 1. CONFIGURACIÓN INICIAL ---
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-CREDENTIALS_FILE = 'credentials.json'
+ruta_credenciales = '/etc/secrets/credentials.json'
 
 # IDs de tus recursos de Google (reemplazar con los tuyos)
-SHEET_ID = '1k_q4CctzbMnqDb2CbIPm-LdHzBHCkOcnBEiWoK12YoQ' # ID de tu Google Sheet
+SHEET_ID = os.environ.get('SHEET_ID') # ID de tu Google Sheet
 SHEET_NAME = 'RESIDUALES' # Nombre exacto de la hoja
-PHOTOS_FOLDER_ID = '1E60fCgvOQUFYwL3JRLD1VqXN1bbHal_N' # Carpeta donde la App sube las fotos
-REPORTS_FOLDER_ID = '13JzhVuKSM-gjBtsZaLhgHFK5uRsz0jCd' # Carpeta para guardar los reportes terminados
+PHOTOS_FOLDER_ID = os.environ.get('DRIVE_FOLDER_ID') # Carpeta donde la App sube las fotos
+REPORTS_FOLDER_ID = os.environ.get('REPORTS_FOLDER_ID') # Carpeta para guardar los reportes terminados
 TEMPLATE_PATH = 'ejemplo.xltx' # Nombre de tu archivo de plantilla Excel
 
 # --- 2. MAPEO DE CELDAS (El cerebro del generador) ---
@@ -169,6 +169,24 @@ def generar_reporte_excel(datos_registro, plantilla_path):
     filename = f'Reporte_Pozo_{pozo_numero}.xlsx'
 
     return buffer, filename
+# --- NUEVA FUNCIÓN DE AYUDA ---
+def rellenar_hoja(sheet, datos_registro):
+    """
+    Toma una hoja de cálculo (sheet) y la rellena con los datos de un registro.
+    """
+    print(f"  - Rellenando hoja '{sheet.title}'...")
+    for campo, mapeo in CELL_MAPPING.items():
+        valor = datos_registro.get(campo)
+        if valor is None or valor == '':
+            continue
+
+        if mapeo['type'] == 'direct':
+            sheet[mapeo['cell']] = valor
+        elif mapeo['type'] == 'options':
+            celda_a_marcar = mapeo['values'].get(valor)
+            if celda_a_marcar:
+                sheet[celda_a_marcar] = 'X'
+    print(f"  - Hoja '{sheet.title}' rellenada.")
 
 def upload_to_drive(file_buffer, filename, folder_id, drive_service):
     """Sube un archivo desde un buffer de memoria a una carpeta de Google Drive."""
@@ -184,60 +202,87 @@ def upload_to_drive(file_buffer, filename, folder_id, drive_service):
     print("¡Subida completada!")
 
 def main():
-    """Función principal que se ejecutará como tarea programada."""
-    print("--- Iniciando Proceso de Generación de Reportes ---")
+    print("--- Iniciando Proceso de Generación de Reporte Consolidado ---")
     try:
-        # --- Autenticación ---
-        credentials = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
+        # --- Autenticación (sin cambios) ---
+        credentials = Credentials.from_service_account_file(ruta_credenciales, scopes=SCOPES)
         gc = gspread.authorize(credentials)
         drive_service = build('drive', 'v3', credentials=credentials)
         print("Autenticación con Google exitosa.")
 
-        # --- Leer datos de Google Sheets ---
+        # --- Leer datos de Google Sheets (sin cambios) ---
         hoja = gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
-        todos_los_datos = hoja.get_all_records() # Obtiene todos los datos como una lista de diccionarios
-
-        # Encontrar la columna de "Estado" para poder actualizarla
+        todos_los_datos = hoja.get_all_records()
         header = hoja.row_values(1)
-        try:
-            columna_estado_idx = header.index('Estado') + 1
-        except ValueError:
-            print("Error Crítico: No se encontró la columna 'Estado' en la hoja de cálculo.")
+        columna_estado_idx = header.index('Estado') + 1
+
+        # --- Filtrar solo los registros pendientes ---
+        registros_pendientes = [
+            (i + 2, registro) for i, registro in enumerate(todos_los_datos) if registro.get('Estado') == 'Pendiente'
+        ]
+
+        if not registros_pendientes:
+            print("No hay registros pendientes para procesar. Finalizando.")
             return
 
-        print(f"Se encontraron {len(todos_los_datos)} registros en total.")
+        print(f"Se encontraron {len(registros_pendientes)} registros pendientes para procesar.")
 
-        # --- Procesar cada registro ---
-        # Iteramos con un índice para saber el número de la fila (sumamos 2 por el header y el índice base 0)
-        for i, registro in enumerate(todos_los_datos):
-            fila_numero = i + 2
-            estado = registro.get('Estado')
+        # --- Lógica de Creación del Reporte Consolidado ---
+        # 1. Cargamos la plantilla UNA SOLA VEZ
+        try:
+            workbook = openpyxl.load_workbook(TEMPLATE_PATH)
+            template_sheet = workbook.active
+        except FileNotFoundError:
+            print(f"Error Crítico: No se encontró la plantilla en la ruta: {TEMPLATE_PATH}")
+            return
+        
+        # 2. Iteramos sobre los registros pendientes
+        filas_a_actualizar = []
+        for i, (fila_numero, registro) in enumerate(registros_pendientes):
+            pozo_num = registro.get('Pozo Numero', f"Fila_{fila_numero}")
+            print(f"\nProcesando Pozo: {pozo_num}")
 
-            if estado == 'Pendiente':
-                pozo_num = registro.get('Pozo Numero', 'N/A')
-                print(f"\nProcesando registro en Fila {fila_numero} (Pozo: {pozo_num})...")
+            if i == 0:
+                # Para el primer pozo, reutilizamos la primera hoja que ya existe
+                nueva_hoja = template_sheet
+                nueva_hoja.title = str(pozo_num)
+            else:
+                # Para los siguientes, copiamos la plantilla para crear una hoja nueva
+                nueva_hoja = workbook.copy_worksheet(template_sheet)
+                nueva_hoja.title = str(pozo_num)
+            
+            # 3. Rellenamos la nueva hoja con los datos del pozo actual
+            rellenar_hoja(nueva_hoja, registro)
+            filas_a_actualizar.append(fila_numero)
+        
+        # 4. Si creamos hojas nuevas, borramos la plantilla original si ya no la necesitamos
+        if len(registros_pendientes) > 1:
+             # Si el nombre de la plantilla original no fue cambiado (caso de un solo pozo)
+             if template_sheet.title not in [str(r.get('Pozo Numero', f"Fila_{f}")) for f, r in registros_pendientes]:
+                workbook.remove(template_sheet)
 
-                # 1. Generar el archivo Excel en memoria
-                reporte_buffer, filename = generar_reporte_excel(registro, TEMPLATE_PATH)
 
-                if not reporte_buffer:
-                    print(f"Error al generar el reporte para el pozo {pozo_num}. Saltando al siguiente.")
-                    continue
+        # 5. Guardamos el libro de Excel completo en memoria
+        buffer = BytesIO()
+        workbook.save(buffer)
+        buffer.seek(0)
+        
+        # 6. Generamos un nombre de archivo con la fecha y hora actual
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        filename = f'Reporte_Consolidado_{timestamp}.xlsx'
 
-                # 2. Subir el reporte a Google Drive
-                upload_to_drive(reporte_buffer, filename, REPORTS_FOLDER_ID, drive_service)
+        # 7. Subimos el ÚNICO archivo a Google Drive
+        upload_to_drive(buffer, filename, REPORTS_FOLDER_ID, drive_service)
+        
+        # 8. Actualizamos el estado de TODAS las filas procesadas en Google Sheets
+        print("\nActualizando estados en Google Sheets...")
+        for fila_num in filas_a_actualizar:
+            hoja.update_cell(fila_num, columna_estado_idx, 'Generado')
+            print(f" - Fila {fila_num} actualizada a 'Generado'.")
 
-                # 3. Actualizar el estado en Google Sheets a "Generado"
-                print(f"Actualizando estado a 'Generado' en la fila {fila_numero}...")
-                hoja.update_cell(fila_numero, columna_estado_idx, 'Generado')
-                print("¡Estado actualizado!")
-
-    except FileNotFoundError:
-        print(f"Error Crítico: No se encuentra el archivo de credenciales '{CREDENTIALS_FILE}'.")
     except Exception as e:
         print(f"--- ¡Ocurrió un error inesperado! ---")
         print(f"Error: {e}")
-        # En un sistema de producción, aquí podrías enviar una notificación por email.
 
     print("\n--- Proceso de Generación de Reportes Finalizado ---")
 

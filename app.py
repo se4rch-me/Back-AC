@@ -12,9 +12,10 @@ app = Flask(__name__)
 # Es una mejor práctica leer estos valores de variables de entorno
 # pero por ahora los dejamos aquí para claridad.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-SPREADSHEET_ID = '1k_q4CctzbMnqDb2CbIPm-LdHzBHCkOcnBEiWoK12YoQ'
-DRIVE_FOLDER_ID = '1E60fCgvOQUFYwL3JRLD1VqXN1bbHal_N'
-SHEET_NAME = 'RESIDUALES' # Nombre de la hoja específica
+SHEET_ID = os.environ.get('SHEET_ID')
+REPORTS_FOLDER_ID = os.environ.get('REPORTS_FOLDER_ID')
+SHEET_NAME = 'RESIDUALES'
+TEMPLATE_PATH = 'ejemplo.xltx' 
 
 @app.route('/')
 def home():

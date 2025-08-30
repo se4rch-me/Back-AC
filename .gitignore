@@ -1,0 +1,11 @@
+# Archivos de entorno virtual
+venv/
+*.venv/
+
+# Archivos de credenciales y secretos
+credentials.json
+*.secret
+
+# Archivos compilados de Python
+__pycache__/
+*.pyc

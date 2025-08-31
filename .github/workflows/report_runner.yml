@@ -1,0 +1,39 @@
+name: Generador de Reportes Consolidados
+
+# Disparadores: Cuándo se debe ejecutar esta acción
+on:
+  # 1. Ejecución programada: cada hora, en punto.
+  schedule:
+    - cron: '0 * * * *'
+  
+  # 2. Disparador manual: permite ejecutarlo desde la web de GitHub.
+  workflow_dispatch:
+
+# Tareas: Qué debe hacer
+jobs:
+  generar-reporte:
+    runs-on: ubuntu-latest  # Usará una máquina virtual con Linux
+
+    steps:
+      # Paso 1: Descargar el código de nuestro repositorio
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      # Paso 2: Configurar el entorno de Python
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # Paso 3: Instalar todas las librerías necesarias
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      # Paso 4: Ejecutar nuestro script de Python
+      - name: Correr el generador de reportes
+        env:
+          # Mapeamos los secretos de GitHub a las variables de entorno que lee el script
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          REPORTS_FOLDER_ID: ${{ secrets.REPORTS_FOLDER_ID }}
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+        run: python report_generator.py

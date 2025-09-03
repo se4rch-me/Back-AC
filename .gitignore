@@ -9,3 +9,6 @@ credentials.json
 # Archivos compilados de Python
 __pycache__/
 *.pyc
+
+.env
+entrada.json

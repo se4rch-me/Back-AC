@@ -1,7 +1,18 @@
+# --- Servidor Web ---
 Flask
-gunicorn
+
+# --- APIs de Google ---
 gspread
 google-api-python-client
+google-auth-httplib2
 google-auth-oauthlib
+
+
+# --- Manejo de Excel ---
 openpyxl
-requests
+
+# --- Manejo de Imágenes ---
+Pillow
+
+# --- Variables de Entorno Locales ---
+python-dotenv

@@ -1,11 +1,11 @@
 from google_clients import get_gspread_client
-from config import SPREADSHEET_ID, SHEET_NAME
+from config import SPREADSHEET_ID, WORKSHEET_NAME
 
 def get_pending_records():
     """Obtiene todos los registros de la hoja de cálculo que están marcados como 'Pendiente'."""
     print("Accediendo a Google Sheets para buscar registros pendientes...")
     gc = get_gspread_client()
-    worksheet = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_NAME)
+    worksheet = gc.open_by_key(SPREADSHEET_ID).worksheet(WORKSHEET_NAME)
     
     all_records = worksheet.get_all_records()
     header = worksheet.row_values(1)

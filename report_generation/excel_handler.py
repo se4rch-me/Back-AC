@@ -1,7 +1,7 @@
 import json
 import os
 from openpyxl.drawing.image import Image as OpenpyxlImage
-from openpyxl.styles import PatternFill, Border, Side
+from openpyxl.styles import PatternFill, Border, Side, Font
 
 from .image_generator import create_connections_table_image
 
@@ -42,10 +42,24 @@ def fill_sheet(sheet, record):
     """Rellena una hoja de cálculo con los datos de un registro."""
     print(f"  - Rellenando hoja para el pozo '{record.get('pozo_numero')}'...")
 
-    # 1. Relleno de celdas directas y de opciones
+    # 1. Relleno de celdas
     for field, mapping in CELL_MAPPING.items():
-        value = record.get(field)
-        if value is not None and value != '':
+        value = record.get(field, '')
+
+        if field == 'observaciones':
+            cell_coord = mapping['cell']
+            text = " " + str(value)
+            
+            if len(text) > 44:
+                processed_text = text[:44]
+            else:
+                processed_text = text.ljust(44, '_')
+
+            cell = sheet[cell_coord]
+            cell.value = processed_text
+            cell.font = cell.font.copy(underline='single')
+
+        elif value is not None and value != '':
             if mapping['type'] == 'direct':
                 sheet[mapping['cell']] = value
             elif mapping['type'] == 'options':
@@ -59,9 +73,12 @@ def fill_sheet(sheet, record):
         connections = json.loads(connections_json)
         if connections:
             sheet['D7'] = connections[0].get('cota_razante')
-            table_img_buffer = create_connections_table_image(connections)
+            
+            width_px = 338
+
+            table_img_buffer = create_connections_table_image(connections, target_width_px=width_px)
             img_tabla = OpenpyxlImage(table_img_buffer)
-            sheet.add_image(img_tabla, 'M55')
+            sheet.add_image(img_tabla, 'M56')
     except Exception as e:
         print(f"  - Advertencia al procesar conexiones: {e}")
 
@@ -83,7 +100,6 @@ def fill_sheet(sheet, record):
 
     # 4. Aplicar estilos de marco y fondo
     try:
-        # Color de fondo gris claro
         gray_fill = PatternFill(start_color="ADADAD", end_color="ADADAD", fill_type="solid")
         for row in sheet.iter_rows():
             for cell in row:
@@ -91,22 +107,15 @@ def fill_sheet(sheet, record):
                     cell.fill = gray_fill
         print("  - Aplicando color de fondo por defecto.")
 
-        # Borde azul mediano
         blue_medium_side = Side(border_style="medium", color="0000FF")
         
-        # Aplicar borde derecho a la columna N (14)
         for row_idx in range(1, 83):
             cell = sheet.cell(row=row_idx, column=14)
-            existing_border = cell.border.copy()
-            existing_border.right = blue_medium_side
-            cell.border = existing_border
+            cell.border = cell.border.copy(right=blue_medium_side)
 
-        # Aplicar borde inferior a la fila 82
         for col_idx in range(1, 15):
             cell = sheet.cell(row=82, column=col_idx)
-            existing_border = cell.border.copy()
-            existing_border.bottom = blue_medium_side
-            cell.border = existing_border
+            cell.border = cell.border.copy(bottom=blue_medium_side)
         print("  - Aplicando bordes al marco.")
 
     except Exception as e:

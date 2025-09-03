@@ -12,3 +12,5 @@ __pycache__/
 
 .env
 entrada.json
+testeo.csv
+generated_env_credentials.json

@@ -3,12 +3,9 @@ import os
 from openpyxl.drawing.image import Image as OpenpyxlImage
 
 from .image_generator import create_connections_table_image
-# Ya no necesitamos download_photo para el esquema, pero podría ser útil para otras cosas en el futuro.
-# Por ahora, podemos comentarlo o dejarlo si planeamos añadir fotos de evidencia al reporte.
-# from .drive_handler import download_photo 
+
 # --- LA "RECETA" MAESTRA DEL REPORTE ---
 CELL_MAPPING = {
-    # ... (el mismo diccionario CELL_MAPPING que tenías)
     'fecha': {'type': 'direct', 'cell': 'D3'},
     'consecutivo': {'type': 'direct', 'cell': 'H3'},
     'direccion': {'type': 'direct', 'cell': 'D4'},

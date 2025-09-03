@@ -1,25 +1,32 @@
 import io
+import tempfile
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 from google_clients import get_drive_client
 from config import MASTER_REPORT_ID, DRIVE_FOLDER_ID
 
 def download_master_report():
-    """Descarga el archivo de reporte maestro desde Google Drive y lo devuelve como un buffer en memoria."""
+    """Descarga el reporte maestro, lo guarda en un archivo temporal y devuelve la ruta."""
     print("Descargando reporte maestro desde Google Drive...")
     service = get_drive_client()
     request = service.files().get_media(fileId=MASTER_REPORT_ID)
-    file_buffer = io.BytesIO()
-    downloader = MediaIoBaseDownload(file_buffer, request)
-    
-    done = False
-    while not done:
-        status, done = downloader.next_chunk()
-        print(f"Descarga: {int(status.progress() * 100)}%.")
+    # Crear un archivo temporal que no se borre al cerrar
+    try:
+        temp_f = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
         
-    file_buffer.seek(0)
-    print("Reporte maestro descargado.")
-    return file_buffer
+        downloader = MediaIoBaseDownload(temp_f, request)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+            print(f"Descarga: {int(status.progress() * 100)}%.")
+        
+        temp_file_path = temp_f.name
+        return temp_file_path
+    finally:
+        temp_f.close() # Asegurarse de cerrar el archivo
+
+    print(f"Reporte maestro guardado temporalmente en: {temp_file_path}")
+    return temp_file_path
 
 def download_photo(pozo_numero):
     """Descarga la primera foto encontrada para un número de pozo específico."""

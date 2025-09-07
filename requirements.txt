@@ -1,5 +1,6 @@
 # --- Servidor Web ---
 Flask
+flask-cors
 
 # --- APIs de Google ---
 gspread

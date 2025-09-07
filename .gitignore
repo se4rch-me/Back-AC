@@ -14,3 +14,4 @@ __pycache__/
 entrada.json
 testeo.csv
 generated_env_credentials.json
+token.json

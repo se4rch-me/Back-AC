@@ -3,7 +3,7 @@ import io
 from googleapiclient.http import MediaIoBaseUpload
 
 from google_clients import get_sheets_client, get_drive_client
-from config import SPREADSHEET_ID, SHEET_NAME, DRIVE_FOLDER_ID
+from config import SPREADSHEET_ID, WORKSHEET_NAME, DRIVE_FOLDER_ID
 
 def ingest_survey(data_str, files):
     """
@@ -22,7 +22,7 @@ def ingest_survey(data_str, files):
     # 2. Escribir en Google Sheets
     service_sheets.spreadsheets().values().append(
         spreadsheetId=SPREADSHEET_ID,
-        range=f"{SHEET_NAME}!A:Z",
+        range=f"{WORKSHEET_NAME}!A:Z",
         valueInputOption='USER_ENTERED',
         body={'values': [fila_para_sheets]}
     ).execute()
